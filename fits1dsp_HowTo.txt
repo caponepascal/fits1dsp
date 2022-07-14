@@ -1,0 +1,34 @@
+Plotting GUI for 1D spectra from FITS files.
+The script uses a .json catalog file ("extensions_catalog.json") to store and access the location of the data depending on the observation instrument. The GUI is implemented using PyQt5 via .ui files ("fits1dsp*_main.ui", "fits1dsp*_infotab.ui", "fits1dsp*_plottab.ui" and "fits1dsp*_help.ui").
+
+Functionalities and Buttons:
+- General: 
+    - "quit": close the program
+    - "help": open new window containing the information provided in fits1dsp_HowTo.txt
+- File selection:
+    FITS:
+    - "browse": add FITS files to the selection table
+    - "select all": select all FITS files in the selection table
+    - "unselect all": unselect all FITS files in the selection table
+    - "remove": remove the selected files from the selection table
+    - "clear": remove all files from the selection table
+    Mask:
+    - "browse": add .dat files to the selection table
+    - "remove": remove the selected files from the selection table
+    - "clear": remove all files from the selection table
+Files can be selected by checking the respective row in the table. Only one telluric mask can be selected at a time. Removing a FITS file from the selection table will automatically close the corresponding info and plot tabs.
+- Info:
+    - "info": show the file structure and headers of the selected files in separate tabs
+- Plot:
+    - "Channel": select the data channel to plot
+    - "Wavelength units": select the wavelength units for the plot
+    - "Normalize": compute a 3rd order polynomial continuum fit for normalization; intended to be qualitative to facilitate plotting data from different instruments
+    - "plot separate": plot the data from the selected FITS files separately in different tabs
+    - "plot together": plot the data from the selected FITS files together in the same tab
+    - "update": not available yet
+
+Notes:
+Currently only works with HPF and CARMENES data.
+
+Contact:
+caponepascal@gmail.com

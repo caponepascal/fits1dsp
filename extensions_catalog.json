@@ -1,0 +1,66 @@
+{
+"CARMENES": {
+    "science": {
+        "flux": {
+            "format": "Image",
+            "data": "SPEC"
+            },
+        "error": {
+            "format": "Image",
+            "data": "SIG"
+            },
+        "wavelength": {
+            "format": "Image",
+            "data": "WAVE",
+            "units": 1e-10
+            }
+        }
+    },
+"HPF": {
+    "science": {
+        "flux": {
+            "format": "Image",
+            "data": "Sci Flux"
+            },
+        "error": {
+            "format": "Image",
+            "data": "Sci Error"
+            },
+        "wavelength":{
+            "format": "Image",
+            "data": "Sci Wavl",
+            "units": 1e-10
+            }
+        },
+    "sky": {
+        "flux": {
+            "format": "Image",
+            "data": "Sky Flux"
+            },
+        "error": {
+            "format": "Image",
+            "data": "Sky Error"
+            },
+        "wavelength":{
+            "format": "Image",
+            "data": "Sky Wavl",
+            "units": 1e-10
+            }
+        },
+    "calibration": {
+        "flux": {
+            "format": "Image",
+            "data": "Cal Flux"
+            },
+        "error": {
+            "format": "Image",
+            "data": "Cal Error"
+            },
+        "wavelength":{
+            "format": "Image",
+            "data": "Cal Wavl",
+            "units": 1e-10
+            }
+        }
+    }
+}
