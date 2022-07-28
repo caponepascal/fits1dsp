@@ -432,7 +432,7 @@ class HelpWindow(QtWidgets.QMainWindow, Ui_HelpWindow):
         self.setupUi(self)
         
     def display_help(self):
-        help = open("fits1dsp_HowTo.txt", "r").read()
+        help = open(sys.path[0] + "/fits1dsp_HowTo.txt", "r").read()
         self.textBox_help.append(help)
         self.show()
         
@@ -455,19 +455,17 @@ def convert_parser_input(args):
     return args
         
 if __name__ == "__main__":
-    # Command line arguments
+    #Command line arguments:
     parser = argparse.ArgumentParser(description = "Display 1D FITS spectra.")
     parser.add_argument('-f', '--files', nargs='*' , help = "FITS files to be selected on start, as path to the individual FITS files or to files containing a list of paths to the individual FITS files.")
     args = convert_parser_input(parser.parse_args())
     globals().update(vars(args))
-    
-    # App
+    #App:
     app = QtWidgets.QApplication(sys.argv)
     window = MainWindow()
     window.show() 
     if len(args.files) != 0:
         window.make_table_fits(args.files)
         window.select_all_fits()
-        #window.plot_separate()
     
     sys.exit(app.exec_())
