@@ -1,8 +1,10 @@
 __author__ = 'pascal capone'
 
-'''Required libraries'''
+'''Required packages'''
 #General:
 import sys
+import argparse
+import re
 import numpy as np
 import json
 #matplotlib:
@@ -12,10 +14,9 @@ mpl.use('Qt5Agg')
 #astropy:
 from astropy.io import fits
 #PyQt5:
-from PyQt5 import QtCore, QtWidgets, QtGui, uic
+from PyQt5 import QtCore, QtWidgets, uic
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as FigureToolbar
-from matplotlib.figure import Figure
 #Debug:
 import datetime
 #Test:
@@ -23,13 +24,13 @@ import datetime
 #import random
 
 '''Catalogs'''
-with open("extensions_catalog.json", "r") as file:
+with open(sys.path[0] + "/extensions_catalog.json", "r") as file:
     extensions = json.load(file)
     
 units = {"m": 1., "cm": 1e-2, "mm": 1e-3, "µm": 1e-6, "nm": 1e-9, "Å": 1e-10}
 
 '''FITS 1D Spectrum Plotter'''
-Ui_MainWindow, QtBaseClass = uic.loadUiType("fits1dsp_main.ui")
+Ui_MainWindow, QtBaseClass = uic.loadUiType(sys.path[0] + "/fits1dsp_main.ui")
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
@@ -52,7 +53,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.button_plot_separate.clicked.connect(self.plot_separate)
         self.button_plot_together.clicked.connect(self.plot_together)
         
-        self.table_fits.setColumnWidth(0, 29)
+        self.table_fits.setColumnWidth(0, 29)         
         self.table_fits.itemClicked.connect(self.select_fits)
         self.selected_fits = list()
         
@@ -62,8 +63,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     
         self.table_telluric.setColumnWidth(0, 29)
         self.table_telluric.itemClicked.connect(self.select_telluric)
-        self.telluric_item = None
-        self.telluric_mask = None
+        self.selected_telluric = None
+        self.selected_telluric_data = None
         
         self.tabWidget_plot.clear()
         self.plotted_fits = list()
@@ -72,7 +73,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         #self.button_test.clicked.connect(self.test)
     
     #def test(self):
-        #print("test")
 
     def help(self):
         self.help_window.display_help()
@@ -82,7 +82,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.close()
     
     def browse_fits(self):
-        files = QtWidgets.QFileDialog.getOpenFileNames(self, "Select one or more reduced FITS files", " ", filter = "*.fits")[0]
+        files_fits = QtWidgets.QFileDialog.getOpenFileNames(self, "Select one or more reduced FITS files", " ", filter = "*.fits")[0]
+        self.make_table_fits(files_fits)
+        
+    def make_table_fits(self, files):
         row = self.table_fits.rowCount()
         self.table_fits.setRowCount(row + len(files))
         for item in files:
@@ -238,10 +241,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                         checkbox.setCheckState(QtCore.Qt.Checked)
 
     def browse_telluric(self):
-        files = QtWidgets.QFileDialog.getOpenFileNames(self, "Select one or more telluric masks", " ", filter = "*.dat")[0]
+        self.files_telluric = QtWidgets.QFileDialog.getOpenFileNames(self, "Select one or more telluric masks", " ", filter = "*.dat")[0]
         row = self.table_telluric.rowCount()
-        self.table_telluric.setRowCount(row + len(files))
-        for item in files:
+        self.table_telluric.setRowCount(row + len(self.files_telluric))
+        for item in self.files_telluric:
             checkbox_telluric = QtWidgets.QTableWidgetItem(row)
             checkbox_telluric.setFlags(QtCore.Qt.ItemIsUserCheckable |
                                    QtCore.Qt.ItemIsEnabled)
@@ -258,26 +261,26 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def select_telluric(self, checkbox):
         if checkbox.column() == 0:
             if checkbox.checkState() == QtCore.Qt.Checked:
-                self.telluric_item = self.table_telluric.item(checkbox.row(), 1)
-                self.telluric_mask = np.loadtxt(self.telluric_item.text())
+                self.selected_telluric = self.table_telluric.item(checkbox.row(), 1)
+                self.selected_telluric_data = np.loadtxt(self.selected_telluric.text())
                 rows = list(np.arange(self.table_telluric.rowCount()))
                 rows.remove(checkbox.row())
                 for r in rows:
                     self.table_telluric.item(r, 0).setCheckState(QtCore.Qt.Unchecked)
             if checkbox.checkState() == QtCore.Qt.Unchecked:
-                self.telluric_item = None
-                self.telluric_mask = None
+                self.selected_telluric = None
+                self.selected_telluric_data = None
                 
     def remove_telluric(self):
-        self.table_telluric.removeRow(self.telluric_item.row())
-        self.telluric_item = None
-        self.telluric_mask = None
+        self.table_telluric.removeRow(self.selected_telluric.row())
+        self.selected_telluric = None
+        self.selected_telluric_data = None
     
     def clear_telluric(self):
         self.table_telluric.clearContents()
         self.table_telluric.setRowCount(0)
-        self.telluric_item = None
-        self.telluric_mask = None
+        self.selected_telluric = None
+        self.selected_telluric_data = None
 
     def plot_separate(self):
         if self.selected_fits == list():
@@ -286,14 +289,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             channel = self.comboBox_channel.currentText()
             for item in self.selected_fits:
                 if ([item] in self.plotted_fits) and (channel in [self.plotted_channel[i] for i in [j for j in range(len(self.plotted_fits)) if [item] == self.plotted_fits[j]]]):
-                    self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nWarning: Selected FITS file already plotted.")
+                    self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nWarning: FITS file " + str(self.table_fits.row(item) + 1) + " already plotted.")
                     continue
                 
                 filename = item.text()
                 try:
                     obj, date, instrument, wave, flux, err = self.get_data(filename)
                 except:
-                    self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nError: Current FITS file structure not present in the extensions catalog.")
+                    self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nError: Structure of FITS file " + str(self.table_fits.row(item) + 1) + " not present in the extensions catalog.")
                     continue
                 
                 if self.checkBox_normalization.checkState() == QtCore.Qt.Checked: # !!! Data not divided in échelle orders needs to be treated differently
@@ -311,9 +314,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 tab.ax.grid(True, lw = 0.5 , c = 'grey', alpha = 0.5)
                 tab.ax.plot(wave.flatten(), flux.flatten(), ls = '-', lw = 0.5, marker = '.', ms = 0.5, c = 'black', label = obj + " | " + date + " | " + instrument)
                 try:
-                    tab.ax.fill_between(self.telluric_mask[:,0], self.telluric_mask[:,1]*np.nanmax(flux), where=((self.telluric_mask[:,0] > np.nanmin(wave)) & (self.telluric_mask[:,0] < np.nanmax(wave))), facecolor = 'grey', alpha = 0.5)
+                    tab.ax.fill_between(self.selected_telluric_data[:,0], self.selected_telluric_data[:,1]*np.nanmax(flux), where=((self.selected_telluric_data[:,0] > np.nanmin(wave)) & (self.selected_telluric_data[:,0] < np.nanmax(wave))), facecolor = 'grey', alpha = 0.5)
                 except:
-                    self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nWarning: No telluric mask selected.")
+                    self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nWarning: No telluric mask selected for FITS file " + str(self.table_fits.row(item) + 1) + ".")
                 tab.ax.legend()
                 tab.fig.tight_layout()
                 
@@ -349,7 +352,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                     obj, date, instrument, wave, flux, err = self.get_data(filename)
                 except:
                     self.tabWidget_plot.removeTab(self.tabWidget_plot.count() - 1)
-                    self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nError: Current FITS file structure not present in the extensions catalog.")
+                    self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nError: Structure of FITS file " + str(self.table_fits.row(item) + 1) + " not present in the extensions catalog.")
                     return
                 
                 if self.checkBox_normalization.checkState() == QtCore.Qt.Checked:
@@ -361,9 +364,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 tab.ax.plot(wave.flatten(), flux.flatten(), ls = '-', lw = 0.5, marker = '.', ms = 0.5, label = obj + " | " + date + " | " + instrument)
             try:
                 # !!! The limits np.nanmin(wave) and np.nanmax)(wave) are defined based on the last dataset, not overall.
-                tab.ax.fill_between(self.telluric_mask[:,0], self.telluric_mask[:,1]*np.nanmax(flux), where=((self.telluric_mask[:,0] > np.nanmin(wave)) & (self.telluric_mask[:,0] < np.nanmax(wave))), facecolor = 'grey', alpha = 0.5)
+                tab.ax.fill_between(self.selected_telluric_data[:,0], self.selected_telluric_data[:,1]*np.nanmax(flux), where=((self.selected_telluric_data[:,0] > np.nanmin(wave)) & (self.selected_telluric_data[:,0] < np.nanmax(wave))), facecolor = 'grey', alpha = 0.5)
             except:
-                self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nWarning: No telluric mask selected.")
+                self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nWarning: No telluric mask selected for selected FITS files.")
             tab.ax.legend()
             tab.fig.tight_layout()
             
@@ -377,13 +380,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             instrument = hdul[0].header["INSTRUME"]
             channel = self.comboBox_channel.currentText()
             
-            if extensions[instrument][channel]['wavelength']['format'] == "Image":
-                _wave = hdul[extensions[instrument][channel]['wavelength']['data']].data
-            elif extensions[instrument][channel]['wavelength']['format'] == "Header":
-                _wave = hdul[0].header[extensions[instrument][channel]['wavelength']['start']] + hdul[0].header[extensions[instrument][channel]['wavelength']['increment']]*np.arange(len(flux_sci))
-            _wave = (extensions[instrument][channel]['wavelength']['units']/units[self.comboBox_units.currentText()])*_wave # units conversion
             _flux = hdul[extensions[instrument][channel]['flux']['data']].data
             _err = hdul[extensions[instrument][channel]['error']['data']].data
+            _wave = hdul[extensions[instrument][channel]['wavelength']['data']].data
+            _wave = (extensions[instrument][channel]['wavelength']['units']/units[self.comboBox_units.currentText()])*_wave # units conversion
             hdul.close()
         return obj, date, instrument, _wave, _flux, _err
         
@@ -401,7 +401,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         p = np.poly1d(p_fit)
         return p(x)
         
-Ui_InfoTab, QtBaseClass = uic.loadUiType("fits1dsp_infotab.ui")
+Ui_InfoTab, QtBaseClass = uic.loadUiType(sys.path[0] + "/fits1dsp_infotab.ui")
 class InfoTab(QtWidgets.QTabWidget, Ui_InfoTab):
     def __init__(self, parent = None):
         QtWidgets.QWidget.__init__(self)
@@ -410,7 +410,7 @@ class InfoTab(QtWidgets.QTabWidget, Ui_InfoTab):
         
         self.table_extension.setColumnWidth(0, 29)
         
-Ui_PlotTab, QtBaseClass = uic.loadUiType("fits1dsp_plottab.ui")
+Ui_PlotTab, QtBaseClass = uic.loadUiType(sys.path[0] + "/fits1dsp_plottab.ui")
 class PlotTab(QtWidgets.QTabWidget, Ui_PlotTab):
     def __init__(self, parent = None):
         QtWidgets.QWidget.__init__(self)
@@ -424,7 +424,7 @@ class PlotTab(QtWidgets.QTabWidget, Ui_PlotTab):
         self.layout.addWidget(self.canvas)
         self.layout.addWidget(self.mpl_toolbar)
         
-Ui_HelpWindow, QtBaseClass = uic.loadUiType("fits1dsp_help.ui")
+Ui_HelpWindow, QtBaseClass = uic.loadUiType(sys.path[0] + "/fits1dsp_help.ui")
 class HelpWindow(QtWidgets.QMainWindow, Ui_HelpWindow):
     def __init__(self, parent = None):
         QtWidgets.QWidget.__init__(self)
@@ -436,8 +436,38 @@ class HelpWindow(QtWidgets.QMainWindow, Ui_HelpWindow):
         self.textBox_help.append(help)
         self.show()
         
+def convert_parser_input(args):
+    files = list()
+    for i, path in enumerate(args.files):
+        if path[-5:] == ".fits":
+            files.append(path)
+        else:
+            try:
+                with open(path) as f:
+                    for line in f.readlines():
+                        paths = [path for path in re.split(',|;|\"|\'|\s+', line) if path[-5:] == ".fits"]
+                        for path in paths:
+                            files.append(path)
+            except:
+                print("Warning: File type of argument " + str(i) +" not understood.")
+                continue
+    args.files = files
+    return args
+        
 if __name__ == "__main__":
+    # Command line arguments
+    parser = argparse.ArgumentParser(description = "Display 1D FITS spectra.")
+    parser.add_argument('-f', '--files', nargs='*' , help = "FITS files to be selected on start, as path to the individual FITS files or to files containing a list of paths to the individual FITS files.")
+    args = convert_parser_input(parser.parse_args())
+    globals().update(vars(args))
+    
+    # App
     app = QtWidgets.QApplication(sys.argv)
     window = MainWindow()
-    window.show()
+    window.show() 
+    if len(args.files) != 0:
+        window.make_table_fits(args.files)
+        window.select_all_fits()
+        #window.plot_separate()
+    
     sys.exit(app.exec_())
