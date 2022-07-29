@@ -1,9 +1,9 @@
 Plotting GUI for 1D spectra from FITS files.
-The script uses a .json catalog file ("extensions_catalog.json") to store and access the location of the data depending on the observation instrument. The GUI is implemented using PyQt5 via .ui files ("fits1dsp_main.ui", "fits1dsp_infotab.ui", "fits1dsp_plottab.ui" and "fits1dsp_help.ui").
+The script uses a JOSN file (extensions_catalog.json) to catalog and access the location of the data depending on the observation instrument. The GUI is implemented using PyQt5 via UI files (fits1dsp_main.ui, fits1dsp_infotab.ui, fits1dsp_plottab.ui and fits1dsp_help.ui).
 
 Functionalities and Buttons:
-_ Command line:
-    - -f, --files: FITS files to be selected on start; must be given as individual paths to the FITS files or to files containing a list of paths to the individual FITS files
+- Command line:
+    - "-f", "--files": FITS files to be selected on start; must be given as individual paths to the FITS files or to files containing a list of paths to the individual FITS files
 - General: 
     - "quit": close the program
     - "help": open new window containing the information provided in fits1dsp_HowTo.txt
@@ -30,7 +30,7 @@ Files can be selected by checking the respective row in the table. Only one tell
     - "update": not available yet
 
 Notes:
-Currently only works with HPF and CARMENES data.
+Currently only works with HPF and CARMENES data structure.
 
 Contact:
 caponepascal@gmail.com

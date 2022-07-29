@@ -438,19 +438,20 @@ class HelpWindow(QtWidgets.QMainWindow, Ui_HelpWindow):
         
 def convert_parser_input(args):
     files = list()
-    for i, path in enumerate(args.files):
-        if path[-5:] == ".fits":
-            files.append(path)
-        else:
-            try:
-                with open(path) as f:
-                    for line in f.readlines():
-                        paths = [path for path in re.split(',|;|\"|\'|\s+', line) if path[-5:] == ".fits"]
-                        for path in paths:
-                            files.append(path)
-            except:
-                print("Warning: File type of argument " + str(i) +" not understood.")
-                continue
+    if args.files != None:
+        for i, path in enumerate(args.files):
+            if path[-5:] == ".fits":
+                files.append(path)
+            else:
+                try:
+                    with open(path) as f:
+                        for line in f.readlines():
+                            paths = [path for path in re.split(',|;|\"|\'|\s+', line) if path[-5:] == ".fits"]
+                            for path in paths:
+                                files.append(path)
+                except:
+                    print("Warning: File type of argument " + str(i) +" not understood.")
+                    continue
     args.files = files
     return args
         
