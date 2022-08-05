@@ -27,7 +27,7 @@ Files can be selected by checking the respective row in the table. Only one tell
     - "Normalize": compute a 3rd order polynomial continuum fit for normalization; intended to be qualitative to facilitate plotting data from different instruments
     - "plot separate": plot the data from the selected FITS files separately in different tabs
     - "plot together": plot the data from the selected FITS files together in the same tab
-    - "update": not available yet
+Plot tabs can be detached into separate, expandable plot windows by double clicking (double click left mouse button) on them in the tab bar or by dragging them out (hold left mouse button and move) of the tab bar. Plot windows can be attached back to the tab bar by closing them.
 
 Notes:
 Currently only works with HPF and CARMENES data structure.

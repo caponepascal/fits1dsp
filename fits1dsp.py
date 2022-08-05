@@ -1,25 +1,27 @@
 __author__ = 'pascal capone'
 
 '''Required packages'''
-#General:
+# General:
 import sys
 import argparse
 import re
 import numpy as np
 import json
-#matplotlib:
+# matplotlib:
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 mpl.use('Qt5Agg')
-#astropy:
+# astropy:
 from astropy.io import fits
-#PyQt5:
+# PyQt5:
 from PyQt5 import QtCore, QtWidgets, uic
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as FigureToolbar
-#Debug:
+# Debug:
 import datetime
-#Test:
+# Internal:
+from detachable_tab import DetachableTabWidget
+# Test:
 #import glob
 #import random
 
@@ -38,47 +40,42 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         
         self.help_window = HelpWindow()
+        self.button_help.clicked.connect(self.help_window.show)
         
-        self.button_help.clicked.connect(self.help)
         self.button_quit.clicked.connect(self.quit)
+        
+        self.table_fits.setColumnWidth(0, 29)         
+        self.table_fits.itemClicked.connect(self.select_fits)
+        self.selected_fits = list()
         self.button_browse_fits.clicked.connect(self.browse_fits)
         self.button_select_all_fits.clicked.connect(self.select_all_fits)
         self.button_unselect_all_fits.clicked.connect(self.unselect_all_fits)
         self.button_remove_fits.clicked.connect(self.remove_fits)
         self.button_clear_fits.clicked.connect(self.clear_fits)
-        self.button_info_fits.clicked.connect(self.load_info)
-        self.button_browse_telluric.clicked.connect(self.browse_telluric)
-        self.button_remove_telluric.clicked.connect(self.remove_telluric)
-        self.button_clear_telluric.clicked.connect(self.clear_telluric)
-        self.button_plot_separate.clicked.connect(self.plot_separate)
-        self.button_plot_together.clicked.connect(self.plot_together)
-        
-        self.table_fits.setColumnWidth(0, 29)         
-        self.table_fits.itemClicked.connect(self.select_fits)
-        self.selected_fits = list()
         
         self.tabWidget_info.clear()
         self.tabWidget_info.setUsesScrollButtons(True)
         self.info_fits = list()
+        self.button_info_fits.clicked.connect(self.load_info)
     
         self.table_telluric.setColumnWidth(0, 29)
         self.table_telluric.itemClicked.connect(self.select_telluric)
         self.selected_telluric = None
         self.selected_telluric_data = None
+        self.button_browse_telluric.clicked.connect(self.browse_telluric)
+        self.button_remove_telluric.clicked.connect(self.remove_telluric)
+        self.button_clear_telluric.clicked.connect(self.clear_telluric)
         
+        self.tabWidget_plot = DetachableTabWidget(self)
         self.tabWidget_plot.clear()
         self.plotted_fits = list()
         self.plotted_channel = list()
-        
-        #self.button_test.clicked.connect(self.test)
-    
-    #def test(self):
-
-    def help(self):
-        self.help_window.display_help()
+        self.comboBox_units.setCurrentIndex(2)
+        self.button_plot_separate.clicked.connect(self.plot_separate)
+        self.button_plot_together.clicked.connect(self.plot_together)
         
     def quit(self):
-        plt.close('all')
+        self.tabWidget_plot.close_detached_tabs()
         self.close()
     
     def browse_fits(self):
@@ -95,7 +92,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             checkbox_fits.setCheckState(QtCore.Qt.Unchecked)
             self.table_fits.setItem(row, 0, checkbox_fits)
             self.table_fits.setItem(row, 1, QtWidgets.QTableWidgetItem(item))
-            with fits.open(item) as hdul:
+            with fits.open(item, mode = "readonly") as hdul:
                 self.table_fits.setItem(row, 2, QtWidgets.QTableWidgetItem(hdul[0].header["OBJECT"]))
                 self.table_fits.setItem(row, 3, QtWidgets.QTableWidgetItem(hdul[0].header["DATE-OBS"]))
                 self.table_fits.setItem(row, 4, QtWidgets.QTableWidgetItem(hdul[0].header["INSTRUME"]))
@@ -141,7 +138,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.info_fits.remove(item)
                 self.tabWidget_info.removeTab(tab_index)
             
-            if item in self.selected_fits:
+            if item in self.selected_fits: #??? Condition ot necessary
                 self.selected_fits.remove(item)
             
             index = [j for j in range(len(self.plotted_fits)) if item in self.plotted_fits[j]]
@@ -149,11 +146,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             for i in index:
                 del self.plotted_fits[i]
                 del self.plotted_channel[i]
+                tab_name = self.tabWidget_plot.tabText(i)
+                if tab_name in self.tabWidget_plot.detached_tabs:
+                    self.tabWidget_plot.detached_tabs[tab_name].close()
                 self.tabWidget_plot.removeTab(i)
                 
             self.table_fits.removeRow(r)
         
-        #Change the name of the remaining tabs accordingly to their new position in the selection table
+        #Change the name of the remaining tabs according to their new position in the selection table
         for item in self.info_fits:
             tab_index = np.where(item == np.array(self.info_fits))[0][0]
             tab_name = "File " + str(self.table_fits.row(item) + 1)
@@ -171,7 +171,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                     tab_name = tab_name[:-1]
                 tab_name += " (" + self.plotted_channel[i] + ")"
                 self.tabWidget_plot.setTabText(i, tab_name)
-                
     
     def clear_fits(self):
         self.table_fits.clearContents()
@@ -189,19 +188,19 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         else:
             for item in self.selected_fits:
                 if item in self.info_fits:
-                    self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nWarning: Selected FITS file already inspected.")
+                    self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nWarning: FITS file " + str(self.table_fits.row(item) + 1) + " already inspected.")
                 else:
                     self.info_fits.append(item)
                     
                     tab_name = "File " + str(self.table_fits.row(item) + 1) #Take the numbering of the selection table
-                    self.tabWidget_info.addTab(InfoTab(self.tabWidget_info), tab_name)
+                    self.tabWidget_info.addTab(InfoTab(), tab_name)
                     tab_index = self.tabWidget_info.count() - 1
                     tab_table_extension = self.tabWidget_info.widget(tab_index).table_extension
                     tab_table_extension.itemClicked.connect(self.select_extension)
                     tab_text_header = self.tabWidget_info.widget(tab_index).textBox_header
                     
                     filename = item.text()
-                    with fits.open(filename) as hdul:
+                    with fits.open(filename, mode = "readonly") as hdul:
                         tab_table_extension.setRowCount(len(hdul))
                         for row, ext in enumerate(hdul):
                             checkbox_extension = QtWidgets.QTableWidgetItem(row)
@@ -228,7 +227,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 for r in rows:
                     self.tabWidget_info.currentWidget().table_extension.item(r, 0).setCheckState(QtCore.Qt.Unchecked)
                 filename = self.info_fits[self.tabWidget_info.currentIndex()].text()
-                with fits.open(filename) as hdul:
+                with fits.open(filename, mode = "readonly") as hdul:
                     self.tabWidget_info.currentWidget().textBox_header.setText(repr(hdul[checkbox.row()].header))
             if checkbox.checkState() == QtCore.Qt.Unchecked:
                 rows = list(np.arange(self.tabWidget_info.currentWidget().table_extension.rowCount()))
@@ -251,7 +250,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             checkbox_telluric.setCheckState(QtCore.Qt.Unchecked)
             self.table_telluric.setItem(row, 0, checkbox_telluric)
             self.table_telluric.setItem(row, 1, QtWidgets.QTableWidgetItem(item))
-            try: # ??? This should not be necessary actually
+            try: #??? This should not be necessary actually
                 i = [pos for pos, char in enumerate(item) if char == "/"][-1]
                 self.table_telluric.setItem(row, 2, QtWidgets.QTableWidgetItem(item[i+1:-4]))
             except:
@@ -299,14 +298,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                     self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nError: Structure of FITS file " + str(self.table_fits.row(item) + 1) + " not present in the extensions catalog.")
                     continue
                 
-                if self.checkBox_normalization.checkState() == QtCore.Qt.Checked: # !!! Data not divided in échelle orders needs to be treated differently
+                if self.checkBox_normalization.checkState() == QtCore.Qt.Checked: #!!! Data not divided in échelle orders needs to be treated differently
                     flux_cont = list()
                     for w, f, e in zip(wave, flux, err):
                         flux_cont.append(self.fit_continuum(w, f, 1/e, 3))
                     flux /= flux_cont
                 
                 tab_name = "File " + str(self.table_fits.row(item) + 1) + " (" + channel + ")" #Take the numbering of the selection table
-                self.tabWidget_plot.addTab(PlotTab(self.tabWidget_plot), tab_name)
+                self.tabWidget_plot.addTab(PlotTab(), tab_name)
                 tab = self.tabWidget_plot.widget(self.tabWidget_plot.count() - 1)
                 
                 tab.ax.set_xlabel("Wavelength ["+self.comboBox_units.currentText()+"]")
@@ -325,7 +324,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def plot_together(self):
         channel = self.comboBox_channel.currentText()
-        selected_fits_copy = self.selected_fits.copy() # ??? Requirement of a copy needs clarification
+        selected_fits_copy = self.selected_fits.copy() #??? Requirement of a copy needs clarification
         #selected_fits_copy.append(channel)
         if self.selected_fits == list():
             self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nError: No FITS file selected.")
@@ -340,7 +339,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                     tab_name += str(self.table_fits.row(item) + 1) + "," #Take the numbering of the selection table
                 tab_name = tab_name[:-1]
             tab_name += " (" + channel + ")"
-            self.tabWidget_plot.addTab(PlotTab(self.tabWidget_plot), tab_name)
+            self.tabWidget_plot.addTab(PlotTab(), tab_name)
             tab = self.tabWidget_plot.widget(self.tabWidget_plot.count() - 1)
 
             tab.ax.set_xlabel("Wavelength ["+self.comboBox_units.currentText()+"]")
@@ -363,7 +362,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                     
                 tab.ax.plot(wave.flatten(), flux.flatten(), ls = '-', lw = 0.5, marker = '.', ms = 0.5, label = obj + " | " + date + " | " + instrument)
             try:
-                # !!! The limits np.nanmin(wave) and np.nanmax)(wave) are defined based on the last dataset, not overall.
+                #!!! The limits np.nanmin(wave) and np.nanmax)(wave) are defined based on the last dataset, not overall.
                 tab.ax.fill_between(self.selected_telluric_data[:,0], self.selected_telluric_data[:,1]*np.nanmax(flux), where=((self.selected_telluric_data[:,0] > np.nanmin(wave)) & (self.selected_telluric_data[:,0] < np.nanmax(wave))), facecolor = 'grey', alpha = 0.5)
             except:
                 self.textBox_debug.append(str(datetime.datetime.now())[0:19] + "\nWarning: No telluric mask selected for selected FITS files.")
@@ -374,7 +373,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.plotted_channel.append(channel)
             
     def get_data(self, filename):
-        with fits.open(filename) as hdul:
+        with fits.open(filename, mode = "readonly") as hdul:
             obj = hdul[0].header["OBJECT"]
             date = hdul[0].header["DATE-OBS"][0:19]
             instrument = hdul[0].header["INSTRUME"]
@@ -391,12 +390,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         x_cut = x[10:-10]
         y_cut = y[10:-10]
         w_cut = w[10:-10]
-        #Mask bad pixel:
+        # Mask bad pixels:
         m_nan = ~np.any(np.isnan([x_cut, y_cut, w_cut]), axis = 0)
         m_inf = ~np.any(np.isinf([x_cut, y_cut, w_cut]), axis = 0)
         m_null = ~np.any(np.array([x_cut, y_cut, w_cut]) == 0, axis = 0)
         m = np.logical_and(np.logical_and(m_nan, m_inf), m_null)
-        #Polynomial fit:
+        # Polynomial fit:
         p_fit = np.polyfit(x_cut[m], y_cut[m], deg, w = w_cut[m])
         p = np.poly1d(p_fit)
         return p(x)
@@ -420,10 +419,12 @@ class PlotTab(QtWidgets.QTabWidget, Ui_PlotTab):
         self.fig, self.ax = plt.subplots(dpi = 35)
         self.canvas = FigureCanvas(self.fig)
         self.mpl_toolbar = FigureToolbar(self.canvas, self)
-        self.layout = QtWidgets.QGridLayout(self.canvasWidget)
+        self.layout = QtWidgets.QVBoxLayout(self.canvasWidget)
         self.layout.addWidget(self.canvas)
         self.layout.addWidget(self.mpl_toolbar)
-        
+        self.setLayout(self.layout)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+
 Ui_HelpWindow, QtBaseClass = uic.loadUiType(sys.path[0] + "/fits1dsp_help.ui")
 class HelpWindow(QtWidgets.QMainWindow, Ui_HelpWindow):
     def __init__(self, parent = None):
@@ -431,10 +432,8 @@ class HelpWindow(QtWidgets.QMainWindow, Ui_HelpWindow):
         Ui_HelpWindow.__init__(self)
         self.setupUi(self)
         
-    def display_help(self):
         help = open(sys.path[0] + "/fits1dsp_HowTo.txt", "r").read()
         self.textBox_help.append(help)
-        self.show()
         
 def convert_parser_input(args):
     files = list()
@@ -467,6 +466,6 @@ if __name__ == "__main__":
     window.show() 
     if len(args.files) != 0:
         window.make_table_fits(args.files)
-        window.select_all_fits()
+        #window.select_all_fits() #!!! Optional
     
     sys.exit(app.exec_())
